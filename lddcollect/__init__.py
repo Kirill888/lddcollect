@@ -2,6 +2,7 @@
 """
 import subprocess
 import itertools
+import sys
 from queue import Queue
 from auditwheel.lddtree import lddtree
 
@@ -46,7 +47,7 @@ def _paths(ltree):
             yield realpath
 
 
-def process_elf(fname):
+def process_elf(fname, verbose=False):
     """Find dependencies for a given elf file.
 
     Returns:
@@ -57,12 +58,16 @@ def process_elf(fname):
       [debs], [files]
 
     """
-    print(f"Finding dependencies ({fname})")
+    if verbose:
+        print(f"Finding dependencies ({fname})", file=sys.stderr)
+
     ltree = lddtree(fname)
     libs = ltree['libs']
     all_libs = list(_paths(ltree))
 
-    print(f"Querying dpkg for files ({len(all_libs)})")
+    if verbose:
+        print(f"Querying dpkg for files ({len(all_libs)})", file=sys.stderr)
+
     debs, non_deb = dpkg_s(*all_libs)
 
     libpath2deb = {path: deb for deb, path in debs}
