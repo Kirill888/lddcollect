@@ -47,7 +47,7 @@ def _paths(ltree):
             yield realpath
 
 
-def process_elf(fname, verbose=False):
+def process_elf(fname, verbose=False, dpkg=True):
     """Find dependencies for a given elf file.
 
     Returns:
@@ -63,19 +63,22 @@ def process_elf(fname, verbose=False):
 
     ltree = lddtree(fname)
     libs = ltree['libs']
-    all_libs = list(_paths(ltree))
 
-    if verbose:
-        print(f"Querying dpkg for files ({len(all_libs)})", file=sys.stderr)
+    if dpkg:
+        lib_files = list(_paths(ltree))
 
-    debs, non_deb = dpkg_s(*all_libs)
+        if verbose:
+            print(f"Querying dpkg for files ({len(lib_files)})", file=sys.stderr)
 
-    libpath2deb = {path: deb for deb, path in debs}
-    lib2deb = {
-        n: libpath2deb.get(lib['path'], None)
-        for n, lib in libs.items()
-    }
-    lib2deb[fname] = libpath2deb.get(ltree['path'], None)
+        debs, non_deb = dpkg_s(*lib_files)
+        libpath2deb = {path: deb for deb, path in debs}
+        lib2deb = {
+            n: libpath2deb.get(lib['path'], None)
+            for n, lib in libs.items()
+        }
+        lib2deb[fname] = libpath2deb.get(ltree['path'], None)
+    else:
+        lib2deb = {}
 
     seen = set()
     debs = set()
