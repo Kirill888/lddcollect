@@ -18,7 +18,7 @@ This tool is Python (3.6+) based. It can be installed with ``pip``:
 
 ::
 
-  pip3 install lddcollect
+  pip install git+https://github.com/Kirill888/lddcollect.git
 
 
 Usage
