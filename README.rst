@@ -17,6 +17,7 @@ Installation
 This tool is Python (3.6+) based. It can be installed with ``pip``:
 
 ::
+
   pip3 install lddcollect
 
 
@@ -24,6 +25,7 @@ Usage
 =====
 
 ::
+
    python3 -m lddcollect --help
    Usage: __main__.py [OPTIONS] [LIBS]...
 
