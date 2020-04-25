@@ -1,8 +1,10 @@
 """ Tools for listing files needed to run elf executable to use elf library.
 """
 import subprocess
-import itertools
 import sys
+import warnings
+from os import readlink
+from pathlib import Path
 from queue import Queue
 from auditwheel.lddtree import lddtree
 
@@ -39,12 +41,43 @@ def dpkg_s(*args):
     return parsed, missing
 
 
+def _resolve_link(link):
+    next_link = Path(readlink(str(link)))
+    if next_link.is_absolute():
+        return next_link
+
+    return link.parent/next_link
+
+
+def _resolve_link_all(path):
+    while path.is_symlink():
+        yield(path)
+        path = _resolve_link(path)
+    yield path
+
+
+def _lib_paths(lib):
+    """ yield all symlinks starting from lib[path]->lib[realpath]
+        Produces Empty sequence if lib[path] is None
+    """
+    path, realpath = lib['path'], lib['realpath']
+    if path == realpath:
+        if path is not None:
+            yield path
+    else:
+        last = ""
+        for p in _resolve_link_all(Path(path)):
+            last = str(p)
+            yield last
+
+        if last != realpath:
+            warnings.warn(f"Symlink didn't go to expected place: {last} != {realpath}")
+
+
 def _paths(ltree):
-    for lib in itertools.chain(iter([ltree]), ltree['libs'].values()):
-        path, realpath = lib['path'], lib['realpath']
-        yield path
-        if path != realpath:
-            yield realpath
+    yield from _lib_paths(ltree)
+    for lib in ltree['libs'].values():
+        yield from _lib_paths(lib)
 
 
 def process_elf(fname, verbose=False, dpkg=True):
@@ -52,16 +85,26 @@ def process_elf(fname, verbose=False, dpkg=True):
 
     Returns:
 
-      List of debian package names supplied file or it's non-dpkg dependants
-      reference and a list of files that are not managed by dpkg.
+      List of debian package names that supplied file or it's non-dpkg
+      dependants reference and a list of files that are not managed by dpkg.
+      Also returns a list of library names that are needed but were not
+      found, for a working binary you expect this list to be empty.
 
-      [debs], [files]
+      [debs], [files], [missing-libs]
 
     """
     if verbose:
         print(f"Finding dependencies ({fname})", file=sys.stderr)
 
     ltree = lddtree(fname)
+
+    # lddtree seems to set realpath to path for top-level lib
+    # but we want it to be just like any other lib
+    if ltree['path'] == ltree['realpath']:
+        root_path = Path(ltree['path'])
+        if root_path.is_symlink():
+            ltree['realpath'] = str(root_path.resolve())
+
     libs = ltree['libs']
 
     if dpkg:
@@ -83,6 +126,7 @@ def process_elf(fname, verbose=False, dpkg=True):
     seen = set()
     debs = set()
     files = set()
+    missing_libs = []
 
     q = Queue()
     q.put((fname, ltree))
@@ -92,17 +136,22 @@ def process_elf(fname, verbose=False, dpkg=True):
         if name in seen:
             continue
 
+        if lib['path'] is None:
+            if verbose:
+                print(f"Failed to find lib: {name}", file=sys.stderr)
+            missing_libs.append(name)
+
         seen.add(name)
         deb = lib2deb.get(name, None)
         if deb is not None:
             debs.add(deb)
             continue
         else:
-            files.add(lib['path'])
-            files.add(lib['realpath'])
+            for p in _lib_paths(lib):
+                files.add(p)
 
         for name in lib['needed']:
             if name not in seen:
                 q.put((name, libs[name]))
 
-    return list(debs), list(files)
+    return list(debs), list(files), missing_libs

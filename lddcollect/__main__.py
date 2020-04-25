@@ -29,11 +29,13 @@ def main(libs, dpkg=False, json=False, verbose=False):
 
     debs = set()
     files = set()
+    missing = []
 
     for lib in libs:
-        _debs, _files = process_elf(lib, verbose=verbose, dpkg=dpkg)
+        _debs, _files, _missing = process_elf(lib, verbose=verbose, dpkg=dpkg)
         debs.update(_debs)
         files.update(_files)
+        missing.extend(_missing)
 
     files = sorted(files)
     debs = sorted(debs) if dpkg else None
@@ -52,5 +54,9 @@ def main(libs, dpkg=False, json=False, verbose=False):
             for deb in debs:
                 print(deb)
 
+    if len(missing) > 0:
+        print(f"There were missing libraries", file=sys.stderr)
+        for lib in missing:
+            print(f"   {lib}", file=sys.stderr)
 
 main()
