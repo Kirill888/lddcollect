@@ -59,5 +59,6 @@ def main(libs, dpkg=False, json=False, verbose=False):
         print(f"\nThere were missing libraries", file=sys.stderr)
         for lib in missing:
             print(f"   {lib}", file=sys.stderr)
+        sys.exit(1)
 
 main()
