@@ -1,0 +1,67 @@
+name: build
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      max-parallel: 2
+      matrix:
+        python-version: [3.6, 3.7]
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Set up Python
+      uses: actions/setup-python@v1
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install python libs
+      run: |
+        python -m pip install --upgrade \
+          pip \
+          setuptools
+
+        python -m pip install \
+          flake8 \
+          twine \
+          wheel
+
+        python -m pip install -e .
+
+    - name: Lint with flake8
+      run: |
+        pip install flake8
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Package wheel
+      run: |
+        python setup.py bdist_wheel
+        find dist -name "*whl" -exec unzip -l '{}' \;
+
+    - name: Package source distribution
+      run: |
+        python setup.py sdist
+
+    - name: Check Distribution Files
+      run: |
+        twine check dist/*
+
+    - name: Publish (test pypi)
+      if: |
+        github.event_name == 'push' && (
+          github.ref == 'refs/heads/master'
+        )
+
+      run: |
+        twine upload --verbose --disable-progress-bar --skip-existing dist/* || true
+
+      env:
+        TWINE_USERNAME: '__token__'
+        TWINE_PASSWORD: ${{ secrets.test_pypi_token }}
+        TWINE_REPOSITORY_URL: 'https://test.pypi.org/legacy/'
