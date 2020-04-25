@@ -80,17 +80,22 @@ def _paths(ltree):
         yield from _lib_paths(lib)
 
 
+def files2deb(files):
+    debs, non_deb = dpkg_s(*files)
+    return {path: deb for deb, path in debs}
+
+
 def process_elf(fname, verbose=False, dpkg=True):
     """Find dependencies for a given elf file.
 
     Returns:
 
-      List of debian package names that supplied file or it's non-dpkg
+      List of Debian package names that supplied file or it's non-dpkg
       dependants reference and a list of files that are not managed by dpkg.
       Also returns a list of library names that are needed but were not
-      found, for a working binary you expect this list to be empty.
+      found, for a working binary one would expect this list to be empty.
 
-      [debs], [files], [missing-libs]
+      [pkgs], [files], [missing-libs]
 
     """
     if verbose:
@@ -111,20 +116,19 @@ def process_elf(fname, verbose=False, dpkg=True):
         lib_files = list(_paths(ltree))
 
         if verbose:
-            print(f"Querying dpkg for files ({len(lib_files)})", file=sys.stderr)
+            print(f"Mapping files to packages ({len(lib_files)})", file=sys.stderr)
 
-        debs, non_deb = dpkg_s(*lib_files)
-        libpath2deb = {path: deb for deb, path in debs}
-        lib2deb = {
-            n: libpath2deb.get(lib['path'], None)
+        libpath2pkg = files2deb(lib_files)
+        lib2pkg = {
+            n: libpath2pkg.get(lib['path'], None)
             for n, lib in libs.items()
         }
-        lib2deb[fname] = libpath2deb.get(ltree['path'], None)
+        lib2pkg[fname] = libpath2pkg.get(ltree['path'], None)
     else:
-        lib2deb = {}
+        lib2pkg = {}
 
     seen = set()
-    debs = set()
+    pkgs = set()
     files = set()
     missing_libs = []
 
@@ -142,9 +146,9 @@ def process_elf(fname, verbose=False, dpkg=True):
             missing_libs.append(name)
 
         seen.add(name)
-        deb = lib2deb.get(name, None)
-        if deb is not None:
-            debs.add(deb)
+        pkg = lib2pkg.get(name, None)
+        if pkg is not None:
+            pkgs.add(pkg)
             continue
         else:
             for p in _lib_paths(lib):
@@ -154,4 +158,4 @@ def process_elf(fname, verbose=False, dpkg=True):
             if name not in seen:
                 q.put((name, libs[name]))
 
-    return list(debs), list(files), missing_libs
+    return list(pkgs), list(files), missing_libs

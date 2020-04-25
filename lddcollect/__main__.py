@@ -27,35 +27,36 @@ def main(libs, dpkg=False, json=False, verbose=False):
 
     """
 
-    debs = set()
+    pkgs = set()
     files = set()
     missing = []
 
     for lib in libs:
         _debs, _files, _missing = process_elf(lib, verbose=verbose, dpkg=dpkg)
-        debs.update(_debs)
+        pkgs.update(_debs)
         files.update(_files)
         missing.extend(_missing)
 
     files = sorted(files)
-    debs = sorted(debs) if dpkg else None
+    pkgs = sorted(pkgs) if dpkg else None
 
     if json:
         out = {'files': files}
-        if debs is not None:
-            out['debs'] = debs
+        if pkgs is not None:
+            out['packages'] = pkgs
         json_dump(out, sys.stdout, indent=2)
     else:
         for file in files:
             print(file)
 
-        if debs is not None:
+        if pkgs is not None:
             print("...")
-            for deb in debs:
-                print(deb)
+            for pkg in pkgs:
+                print(pkg)
 
     if len(missing) > 0:
-        print(f"There were missing libraries", file=sys.stderr)
+        sys.stdout.flush()
+        print(f"\nThere were missing libraries", file=sys.stderr)
         for lib in missing:
             print(f"   {lib}", file=sys.stderr)
 
