@@ -270,6 +270,7 @@ def lddtree(path: str,
             prefix: str = '',
             ldpaths: Optional[Dict[str, List[str]]] = None,
             display: Optional[str] = None,
+            lib_cache: Dict = {},
             _first: bool = True,
             _all_libs: Dict = {}) -> Dict:
     """Parse the ELF dependency tree of the specified file
@@ -289,6 +290,16 @@ def lddtree(path: str,
         will be called.
     display
         The path to show rather than ``path``
+    lib_cache
+        Can re-use result["libs"] dictionary from previous runs to skip searching for
+        common libraries across a set of ELF binaries. Note that cache is read-only,
+        it is not updated with newly found libraries.
+        WARNING: using cache might not be safe if top level elfs use different `rpath/runpath`
+        Example:
+           elf1[rpath=/a] -> /a/libsomething.so
+           elf2[rpath=/b] -> /b/libsomething.so
+        Re-using cache from elf1 to compute lddtree for elf2 will result in incorrect mapping
+        for libsomething.
     _first
         Recursive use only; is this the first ELF?
     _all_libs
@@ -399,6 +410,11 @@ def lddtree(path: str,
         for lib in libs:
             if lib in _all_libs:
                 continue
+            cached = lib_cache.get(lib, None)
+            if cached is not None:
+                _all_libs[lib] = cached
+                continue
+
             if all_ldpaths is None:
                 all_ldpaths = (ldpaths['rpath'] + rpaths + runpaths +
                                ldpaths['env'] + ldpaths['runpath'] +
@@ -415,6 +431,7 @@ def lddtree(path: str,
                                prefix,
                                ldpaths,
                                display=fullpath,
+                               lib_cache=lib_cache,
                                _first=False,
                                _all_libs=_all_libs)
                 _all_libs[lib]['needed'] = lret['needed']
