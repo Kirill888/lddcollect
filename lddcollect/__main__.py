@@ -1,6 +1,7 @@
 import sys
 from json import (dump as json_dump)
 import click
+from typing import List
 from . import process_elf
 
 
@@ -11,7 +12,10 @@ from . import process_elf
 @click.argument('libs',
                 nargs=-1,
                 type=click.Path(exists=True, dir_okay=False, file_okay=True))
-def main(libs, dpkg=False, json=False, verbose=False):
+def main(libs: List[str],
+         dpkg: bool = False,
+         json: bool = False,
+         verbose: bool =False):
     """Find all other libraries and optionally Debian dependencies listed
     applications/libraries require to run.
 

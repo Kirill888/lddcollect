@@ -3,13 +3,14 @@
 import subprocess
 import sys
 import warnings
+from typing import List, Iterable, Tuple, Dict, Set, Any
 from os import readlink
 from pathlib import Path
 from queue import Queue
 from .vendor.lddtree import lddtree
 
 
-def dpkg_s(*args):
+def dpkg_s(*args: str) -> Tuple[List[Tuple[str, str]], List[str]]:
     """ Call `dpkg -S {arg}` and parse output into a list of tuples:
 
         [(pkg-name, full-path)]
@@ -18,7 +19,7 @@ def dpkg_s(*args):
         =======
         [(pkg, path),...], [not-found-inputs]
     """
-    def parse_line(line):
+    def parse_line(line: str) -> Tuple[str, str]:
         idx = line.find(': ')
         if idx < 0:
             raise ValueError('Unexpected output from dpkg')
@@ -41,7 +42,7 @@ def dpkg_s(*args):
     return parsed, missing
 
 
-def _resolve_link(link):
+def _resolve_link(link: Path) -> Path:
     next_link = Path(readlink(str(link)))
     if next_link.is_absolute():
         return next_link
@@ -49,14 +50,14 @@ def _resolve_link(link):
     return link.parent/next_link
 
 
-def _resolve_link_all(path):
+def _resolve_link_all(path: Path) -> Iterable[Path]:
     while path.is_symlink():
         yield(path)
         path = _resolve_link(path)
     yield path
 
 
-def _lib_paths(lib):
+def _lib_paths(lib: Dict[str, str]) -> Iterable[str]:
     """ yield all symlinks starting from lib[path]->lib[realpath]
         Produces Empty sequence if lib[path] is None
     """
@@ -80,12 +81,14 @@ def _paths(ltree):
         yield from _lib_paths(lib)
 
 
-def files2deb(files):
+def files2deb(files: List[str]) -> Dict[str, str]:
     debs, non_deb = dpkg_s(*files)
     return {path: deb for deb, path in debs}
 
 
-def process_elf(fname, verbose=False, dpkg=True):
+def process_elf(fname: str,
+                verbose: bool = False,
+                dpkg: bool = True) -> Tuple[List[str], List[str], List[str]]:
     """Find dependencies for a given elf file.
 
     Returns:
@@ -127,12 +130,12 @@ def process_elf(fname, verbose=False, dpkg=True):
     else:
         lib2pkg = {}
 
-    seen = set()
-    pkgs = set()
-    files = set()
-    missing_libs = []
+    seen: Set[str] = set()
+    pkgs: Set[str] = set()
+    files: Set[str] = set()
+    missing_libs: List[str] = []
 
-    q = Queue()
+    q: 'Queue[Tuple[str, Dict[str, Any]]]' = Queue()
     q.put((fname, ltree))
 
     while not q.empty():
