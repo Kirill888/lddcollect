@@ -183,7 +183,7 @@ def load_ld_paths(root: str = '/', prefix: str = '') -> Dict[str, List[str]]:
     -------
     dict containing library paths to search
     """
-    ldpaths = {'conf': [], 'env': [], 'interp': []}
+    ldpaths: Dict[str, List[str]] = {'conf': [], 'env': [], 'interp': []}
 
     # Load up $LD_LIBRARY_PATH.
     env_ldpath = os.environ.get('LD_LIBRARY_PATH')
@@ -272,7 +272,7 @@ def lddtree(path: str,
             display: Optional[str] = None,
             lib_cache: Dict = {},
             _first: bool = True,
-            _all_libs: Dict = {}) -> Dict:
+            _all_libs: Dict[str, Any] = {}) -> Dict[str, Any]:
     """Parse the ELF dependency tree of the specified file
 
     Parameters
@@ -326,6 +326,9 @@ def lddtree(path: str,
     if _first:
         _all_libs = {}
         ldpaths = load_ld_paths().copy()
+    else:
+        assert ldpaths is not None
+
     ret = {
         'interp': None,
         'path': path if display is None else display,
