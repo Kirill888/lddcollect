@@ -6,7 +6,7 @@ import warnings
 from os import readlink
 from pathlib import Path
 from queue import Queue
-from auditwheel.lddtree import lddtree
+from .vendor.lddtree import lddtree
 
 
 def dpkg_s(*args):
