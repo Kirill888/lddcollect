@@ -4,6 +4,7 @@ import subprocess
 import sys
 import warnings
 from typing import List, Iterable, Tuple, Dict, Set, Any, Union
+import collections
 from os import readlink
 from pathlib import Path
 from queue import Queue
@@ -95,7 +96,7 @@ def _update_realpath(ltree: Dict[str, Any]):
             ltree['realpath'] = str(root_path.resolve())
 
 
-def process_elf(fname: Union[str, List[str]],
+def process_elf(fname: Union[str, Iterable[str]],
                 verbose: bool = False,
                 dpkg: bool = True) -> Tuple[List[str], List[str], List[str]]:
     """Find dependencies for a given elf file.
@@ -115,17 +116,22 @@ def process_elf(fname: Union[str, List[str]],
 
     q: 'Queue[Tuple[str, Dict[str, Any]]]' = Queue()
 
-    if isinstance(fname, list):
+    ltree: Dict[str, Any] = {}
+    if isinstance(fname, str):
+        ltree = lddtree(fname)
+        _update_realpath(ltree)
+        q.put((fname, ltree))
+    elif isinstance(fname, collections.Iterable):
         # create fake top level lib that depends on supplied inputs
         roots = fname
         libs: Dict[str, Any] = {}
-        ltree: Dict[str, Any] = dict(interp=None,
-                                     rpath=None,
-                                     runpath=None,
-                                     path=None,
-                                     realpath=None,
-                                     needed=roots,
-                                     libs=libs)
+        ltree = dict(interp=None,
+                     rpath=None,
+                     runpath=None,
+                     path=None,
+                     realpath=None,
+                     needed=roots,
+                     libs=libs)
         for fname in roots:
             _ldd = lddtree(fname, lib_cache=libs)
             _update_realpath(_ldd)
@@ -134,9 +140,7 @@ def process_elf(fname: Union[str, List[str]],
 
         q.put(('', ltree))
     else:
-        ltree = lddtree(fname)
-        _update_realpath(ltree)
-        q.put((fname, ltree))
+        raise ValueError("Only accept str or Iterable[str]")
 
     libs = ltree['libs']
 
