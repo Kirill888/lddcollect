@@ -3,7 +3,7 @@
 import subprocess
 import sys
 import warnings
-from typing import List, Iterable, Tuple, Dict, Set, Any
+from typing import List, Iterable, Tuple, Dict, Set, Any, Union
 from os import readlink
 from pathlib import Path
 from queue import Queue
@@ -86,7 +86,16 @@ def files2deb(files: List[str]) -> Dict[str, str]:
     return {path: deb for deb, path in debs}
 
 
-def process_elf(fname: str,
+def _update_realpath(ltree: Dict[str, Any]):
+    # lddtree seems to set realpath to path for top-level lib
+    # but we want it to be just like any other lib
+    if ltree['path'] == ltree['realpath']:
+        root_path = Path(ltree['path'])
+        if root_path.is_symlink():
+            ltree['realpath'] = str(root_path.resolve())
+
+
+def process_elf(fname: Union[str, List[str]],
                 verbose: bool = False,
                 dpkg: bool = True) -> Tuple[List[str], List[str], List[str]]:
     """Find dependencies for a given elf file.
@@ -104,14 +113,30 @@ def process_elf(fname: str,
     if verbose:
         print(f"Finding dependencies ({fname})", file=sys.stderr)
 
-    ltree = lddtree(fname)
+    q: 'Queue[Tuple[str, Dict[str, Any]]]' = Queue()
 
-    # lddtree seems to set realpath to path for top-level lib
-    # but we want it to be just like any other lib
-    if ltree['path'] == ltree['realpath']:
-        root_path = Path(ltree['path'])
-        if root_path.is_symlink():
-            ltree['realpath'] = str(root_path.resolve())
+    if isinstance(fname, list):
+        # create fake top level lib that depends on supplied inputs
+        roots = fname
+        libs: Dict[str, Any] = {}
+        ltree: Dict[str, Any] = dict(interp=None,
+                                     rpath=None,
+                                     runpath=None,
+                                     path=None,
+                                     realpath=None,
+                                     needed=roots,
+                                     libs=libs)
+        for fname in roots:
+            _ldd = lddtree(fname, lib_cache=libs)
+            _update_realpath(_ldd)
+            libs.update(_ldd.pop('libs', {}))
+            libs[fname] = _ldd
+
+        q.put(('', ltree))
+    else:
+        ltree = lddtree(fname)
+        _update_realpath(ltree)
+        q.put((fname, ltree))
 
     libs = ltree['libs']
 
@@ -135,15 +160,12 @@ def process_elf(fname: str,
     files: Set[str] = set()
     missing_libs: List[str] = []
 
-    q: 'Queue[Tuple[str, Dict[str, Any]]]' = Queue()
-    q.put((fname, ltree))
-
     while not q.empty():
         name, lib = q.get()
         if name in seen:
             continue
 
-        if lib['path'] is None:
+        if lib['path'] is None and name != '':
             if verbose:
                 print(f"Failed to find lib: {name}", file=sys.stderr)
             missing_libs.append(name)

@@ -31,15 +31,7 @@ def main(libs: List[str],
 
     """
 
-    pkgs = set()
-    files = set()
-    missing = []
-
-    for lib in libs:
-        _debs, _files, _missing = process_elf(lib, verbose=verbose, dpkg=dpkg)
-        pkgs.update(_debs)
-        files.update(_files)
-        missing.extend(_missing)
+    pkgs, files, missing = process_elf(libs, verbose=verbose, dpkg=dpkg)
 
     files = sorted(files)
     pkgs = sorted(pkgs) if dpkg else None
