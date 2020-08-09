@@ -32,8 +32,9 @@ def dpkg_s(*args: str) -> Tuple[List[Tuple[str, str]], List[str]]:
                             stdout=subprocess.PIPE)
 
     exit_code = proc.wait()
+    assert proc.stdout is not None
     lines = proc.stdout.read().decode('utf8').split('\n')
-    parsed = [parse_line(l) for l in lines if l]
+    parsed = [parse_line(line) for line in lines if line]
     missing = []
     if exit_code != 0:
         for arg in args:
