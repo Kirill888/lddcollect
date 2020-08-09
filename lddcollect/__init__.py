@@ -111,19 +111,19 @@ def process_elf(fname: Union[str, Iterable[str]],
       [pkgs], [files], [missing-libs]
 
     """
-    if verbose:
-        print(f"Finding dependencies ({fname})", file=sys.stderr)
-
     q: 'Queue[Tuple[str, Dict[str, Any]]]' = Queue()
 
     ltree: Dict[str, Any] = {}
     if isinstance(fname, str):
+        if verbose:
+            print(f"Finding dependencies ({fname})", file=sys.stderr)
+
         ltree = lddtree(fname)
         _update_realpath(ltree)
         q.put((fname, ltree))
     elif isinstance(fname, collections.Iterable):
         # create fake top level lib that depends on supplied inputs
-        roots = fname
+        roots = [f for f in fname]
         libs: Dict[str, Any] = {}
         ltree = dict(interp=None,
                      rpath=None,
@@ -133,6 +133,9 @@ def process_elf(fname: Union[str, Iterable[str]],
                      needed=roots,
                      libs=libs)
         for fname in roots:
+            if verbose:
+                print(f"Finding dependencies ({fname})", file=sys.stderr)
+
             _ldd = lddtree(fname, lib_cache=libs)
             _update_realpath(_ldd)
             libs.update(_ldd.pop('libs', {}))
