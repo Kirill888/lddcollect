@@ -3,7 +3,7 @@
 import subprocess
 import sys
 import warnings
-from typing import List, Iterable, Tuple, Dict, Set, Any, Union
+from typing import List, Iterable, Tuple, Dict, Set, Any, Union, Optional
 import collections
 from os import readlink
 from pathlib import Path
@@ -36,12 +36,46 @@ def dpkg_s(*args: str) -> Tuple[List[Tuple[str, str]], List[str]]:
     lines = proc.stdout.read().decode('utf8').split('\n')
     parsed = [parse_line(line) for line in lines if line]
     missing = []
+    found = set(path for _, path in parsed)
     if exit_code != 0:
         for arg in args:
-            if not any(arg in path for _, path in parsed):
-                missing.append(arg)
+            if arg.startswith('/') or arg.startswith('./'):
+                if arg not in found:
+                    missing.append(arg)
+            else:
+                if not any(arg in path for path in found):
+                    missing.append(arg)
 
     return parsed, missing
+
+
+def lib2pkg_debian(libs: Dict[str, Dict[str, str]]) -> Dict[str, Optional[str]]:
+    """
+    For each lib lookup Debian package that provides it.
+    """
+
+    path2lib = {}
+
+    for name, lib in libs.items():
+        p = Path(lib['realpath'])
+        path2lib[str(p)] = name
+
+        # Deal with /lib vs /usr/lib ambiguity on Ubuntu 20.04
+        # On 20.04 /lib is a symlink to /usr/lib some packages use
+        # /lib some /usr/lib so we have to lookup both
+        p2 = p.resolve()
+        if p2 != p:
+            path2lib[str(p2)] = name
+
+    debs, _ = dpkg_s(*list(path2lib))
+    lib2pkg: Dict[str, Optional[str]] = {path2lib[path]: pkg
+                                         for pkg, path in debs
+                                         if path in path2lib}
+    for name in libs:
+        if name not in lib2pkg:
+            lib2pkg[name] = None
+
+    return lib2pkg
 
 
 def _resolve_link(link: Path) -> Path:
@@ -149,17 +183,9 @@ def process_elf(fname: Union[str, Iterable[str]],
     libs = ltree['libs']
 
     if dpkg:
-        lib_files = list(_paths(ltree))
-
         if verbose:
-            print(f"Mapping files to packages ({len(lib_files)})", file=sys.stderr)
-
-        libpath2pkg = files2deb(lib_files)
-        lib2pkg = {
-            n: libpath2pkg.get(lib['path'], None)
-            for n, lib in libs.items()
-        }
-        lib2pkg[fname] = libpath2pkg.get(ltree['path'], None)
+            print(f"Mapping libs to packages ({len(ltree['libs'])})", file=sys.stderr)
+        lib2pkg = lib2pkg_debian(ltree['libs'])
     else:
         lib2pkg = {}
 
