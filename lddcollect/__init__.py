@@ -138,7 +138,8 @@ def _update_realpath(ltree: Dict[str, Any]):
 
 def process_elf(fname: Union[str, Iterable[str]],
                 verbose: bool = False,
-                dpkg: bool = True) -> Tuple[List[str], List[str], List[str]]:
+                dpkg: bool = True,
+                dpkg_ignore: List[str] = []) -> Tuple[List[str], List[str], List[str]]:
     """Find dependencies for a given elf file.
 
     Returns:
@@ -191,6 +192,8 @@ def process_elf(fname: Union[str, Iterable[str]],
         if verbose:
             print(f"Mapping libs to packages ({len(ltree['libs'])})", file=sys.stderr)
         lib2pkg = lib2pkg_debian(ltree['libs'])
+        if len(dpkg_ignore) > 0:
+            lib2pkg = {lib: pkg for lib, pkg in lib2pkg.items() if pkg not in dpkg_ignore}
     else:
         lib2pkg = {}
 

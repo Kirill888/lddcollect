@@ -9,13 +9,15 @@ from . import process_elf
 @click.option('--dpkg/--no-dpkg', default=False, help="Lookup dpkg libs or not, default: no")
 @click.option('--json', is_flag=True, help="Output in json format")
 @click.option('--verbose', is_flag=True, help="Print some info to stderr")
+@click.option('--ignore-pkg', multiple=True, type=str, help="Packages to ignore (list package files instead)")
 @click.argument('libs',
                 nargs=-1,
                 type=click.Path(exists=True, dir_okay=False, file_okay=True))
 def main(libs: List[str],
          dpkg: bool = False,
          json: bool = False,
-         verbose: bool =False):
+         verbose: bool =False,
+         ignore_pkg: List[str] = []):
     """Find all other libraries and optionally Debian dependencies listed
     applications/libraries require to run.
 
@@ -31,7 +33,7 @@ def main(libs: List[str],
 
     """
 
-    pkgs, files, missing = process_elf(libs, verbose=verbose, dpkg=dpkg)
+    pkgs, files, missing = process_elf(libs, verbose=verbose, dpkg=dpkg, dpkg_ignore=ignore_pkg)
 
     files = sorted(files)
     pkgs = sorted(pkgs) if dpkg else None
