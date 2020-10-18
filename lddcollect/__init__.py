@@ -57,8 +57,13 @@ def lib2pkg_debian(libs: Dict[str, Dict[str, str]]) -> Dict[str, Optional[str]]:
     path2lib = {}
 
     for name, lib in libs.items():
-        p = Path(lib['realpath'])
-        path2lib[str(p)] = name
+        realpath = lib['realpath']
+        if realpath is None:
+            # missing lib, was not resolved
+            continue
+
+        p = Path(realpath)
+        path2lib[realpath] = name
 
         # Deal with /lib vs /usr/lib ambiguity on Ubuntu 20.04
         # On 20.04 /lib is a symlink to /usr/lib some packages use
