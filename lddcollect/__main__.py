@@ -16,7 +16,7 @@ from . import process_elf
 def main(libs: List[str],
          dpkg: bool = False,
          json: bool = False,
-         verbose: bool =False,
+         verbose: bool = False,
          ignore_pkg: List[str] = []):
     """Find all other libraries and optionally Debian dependencies listed
     applications/libraries require to run.
@@ -54,9 +54,10 @@ def main(libs: List[str],
 
     if len(missing) > 0:
         sys.stdout.flush()
-        print(f"\nThere were missing libraries", file=sys.stderr)
+        print("\nThere were missing libraries", file=sys.stderr)
         for lib in missing:
             print(f"   {lib}", file=sys.stderr)
         sys.exit(1)
+
 
 main()
