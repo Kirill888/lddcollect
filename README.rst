@@ -26,8 +26,8 @@ Usage
 
 ::
 
-   python3 -m lddcollect --help
-   Usage: __main__.py [OPTIONS] [LIBS_OR_DIR]...
+   lddcollect --help
+   Usage: lddcollect [OPTIONS] [LIBS_OR_DIR]...
 
      Find all other libraries and optionally Debian dependencies listed
      applications/libraries require to run.

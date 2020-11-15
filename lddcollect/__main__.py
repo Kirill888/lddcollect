@@ -81,4 +81,5 @@ def main(libs_or_dir: List[str],
         sys.exit(1)
 
 
-main()
+if __name__ == "__main__":
+    main()
