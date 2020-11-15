@@ -249,12 +249,19 @@ def process_elf(fname: Union[str, Iterable[str]],
 
     libs = ltree['libs']
 
+    def _skip_pkg(pkg: str) -> bool:
+        if pkg in dpkg_ignore:
+            return True
+        if pkg.split(':')[0] in dpkg_ignore:
+            return True
+        return False
+
     if dpkg:
         if verbose:
             print(f"Mapping libs to packages ({len(ltree['libs'])})", file=sys.stderr)
         lib2pkg = lib2pkg_debian(ltree['libs'], skip_prefix=skip_prefix)
         if len(dpkg_ignore) > 0:
-            lib2pkg = {lib: pkg for lib, pkg in lib2pkg.items() if pkg not in dpkg_ignore}
+            lib2pkg = {lib: pkg for lib, pkg in lib2pkg.items() if pkg is not None and not _skip_pkg(pkg)}
     else:
         lib2pkg = {}
 
