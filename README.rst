@@ -27,10 +27,18 @@ Usage
 ::
 
    python3 -m lddcollect --help
-   Usage: __main__.py [OPTIONS] [LIBS]...
+   Usage: __main__.py [OPTIONS] [LIBS_OR_DIR]...
 
      Find all other libraries and optionally Debian dependencies listed
      applications/libraries require to run.
+
+     Two ways to run:
+
+     1. Supply single directory on input
+        - Will locate all dynamic libs under that path
+        - Will print external libs only (will not print any input libs that were found)
+     2. Supply paths to individual ELF files on a command line
+        - Will print input libs and any external libs referenced
 
      Prints libraries (including symlinks) that are referenced by input files,
      one file per line.
@@ -45,6 +53,7 @@ Usage
      --dpkg / --no-dpkg  Lookup dpkg libs or not, default: no
      --json              Output in json format
      --verbose           Print some info to stderr
+     --ignore-pkg TEXT   Packages to ignore (list package files instead)
      --help              Show this message and exit.
 
 There are two modes of operation.
