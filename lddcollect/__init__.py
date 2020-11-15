@@ -49,7 +49,8 @@ def dpkg_s(*args: str) -> Tuple[List[Tuple[str, str]], List[str]]:
     return parsed, missing
 
 
-def lib2pkg_debian(libs: Dict[str, Dict[str, str]]) -> Dict[str, Optional[str]]:
+def lib2pkg_debian(libs: Dict[str, Dict[str, str]],
+                   skip_prefix: Optional[str] = None) -> Dict[str, Optional[str]]:
     """
     For each lib lookup Debian package that provides it.
     """
@@ -61,6 +62,10 @@ def lib2pkg_debian(libs: Dict[str, Dict[str, str]]) -> Dict[str, Optional[str]]:
         if realpath is None:
             # missing lib, was not resolved
             continue
+
+        if skip_prefix is not None:
+            if realpath.startswith(skip_prefix):
+                continue
 
         p = Path(realpath)
         path2lib[realpath] = name
@@ -139,8 +144,23 @@ def _update_realpath(ltree: Dict[str, Any]):
 def process_elf(fname: Union[str, Iterable[str]],
                 verbose: bool = False,
                 dpkg: bool = True,
-                dpkg_ignore: List[str] = []) -> Tuple[List[str], List[str], List[str]]:
-    """Find dependencies for a given elf file.
+                dpkg_ignore: List[str] = [],
+                skip_prefix: Optional[str] = None) -> Tuple[List[str], List[str], List[str]]:
+    """
+    Find dependencies for a given elf file.
+
+    :param fname: One or many file paths to ELF files
+
+    :param verbose: Print things to stderr
+
+    :param dpkg: Lookup Debian packages for libs
+
+    :param dpkg_ignore: For these Debian packages pretend like they do not exist.
+
+    :param skip_prefix: Do not list files starting with this prefix, also do
+                        not attempt to lookup Debian packages for libs under
+                        that prefix, this is usually user directory that is
+                        known to not contain any system files.
 
     Returns:
 
@@ -150,7 +170,6 @@ def process_elf(fname: Union[str, Iterable[str]],
       found, for a working binary one would expect this list to be empty.
 
       [pkgs], [files], [missing-libs]
-
     """
     q: 'Queue[Tuple[str, Dict[str, Any]]]' = Queue()
 
@@ -191,7 +210,7 @@ def process_elf(fname: Union[str, Iterable[str]],
     if dpkg:
         if verbose:
             print(f"Mapping libs to packages ({len(ltree['libs'])})", file=sys.stderr)
-        lib2pkg = lib2pkg_debian(ltree['libs'])
+        lib2pkg = lib2pkg_debian(ltree['libs'], skip_prefix=skip_prefix)
         if len(dpkg_ignore) > 0:
             lib2pkg = {lib: pkg for lib, pkg in lib2pkg.items() if pkg not in dpkg_ignore}
     else:
@@ -219,6 +238,8 @@ def process_elf(fname: Union[str, Iterable[str]],
             continue
         else:
             for p in _lib_paths(lib):
+                if skip_prefix is not None and p.startswith(skip_prefix):
+                    continue
                 files.add(p)
 
         for name in lib['needed']:
