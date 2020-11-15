@@ -1,8 +1,9 @@
 import sys
 from json import (dump as json_dump)
 import click
-from typing import List
-from . import process_elf
+from typing import List, Optional
+from pathlib import Path
+from . import process_elf, find_libs
 
 
 @click.command(name='lddcollect')
@@ -12,13 +13,14 @@ from . import process_elf
 @click.option('--ignore-pkg', multiple=True, type=str, help="Packages to ignore (list package files instead)")
 @click.argument('libs',
                 nargs=-1,
-                type=click.Path(exists=True, dir_okay=False, file_okay=True))
+                type=click.Path(exists=True, dir_okay=True, file_okay=True))
 def main(libs: List[str],
          dpkg: bool = False,
          json: bool = False,
          verbose: bool = False,
          ignore_pkg: List[str] = []):
-    """Find all other libraries and optionally Debian dependencies listed
+    """
+    Find all other libraries and optionally Debian dependencies listed
     applications/libraries require to run.
 
     Prints libraries (including symlinks) that are referenced by input files, one
@@ -30,10 +32,19 @@ def main(libs: List[str],
       1. Non-dpkg managed files, one per line
       2. Separator line: ...
       3. Package names, one per line
-
     """
+    pkgs: Optional[List[str]] = None
 
-    pkgs, files, missing = process_elf(libs, verbose=verbose, dpkg=dpkg, dpkg_ignore=ignore_pkg)
+    if len(libs) == 1 and Path(libs[0]).is_dir():
+        prefix = libs[0]
+        libs = list(find_libs(prefix))
+        pkgs, files, missing = process_elf(libs,
+                                           verbose=verbose,
+                                           dpkg=dpkg,
+                                           dpkg_ignore=ignore_pkg,
+                                           skip_prefix=prefix)
+    else:
+        pkgs, files, missing = process_elf(libs, verbose=verbose, dpkg=dpkg, dpkg_ignore=ignore_pkg)
 
     files = sorted(files)
     pkgs = sorted(pkgs) if dpkg else None

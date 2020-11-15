@@ -3,12 +3,54 @@
 import subprocess
 import sys
 import warnings
-from typing import List, Iterable, Tuple, Dict, Set, Any, Union, Optional
+from typing import List, Iterable, Iterator, Tuple, Dict, Set, Any, Union, Optional
 import collections
-from os import readlink
+import re
+from os import readlink, scandir, DirEntry
 from pathlib import Path
 from queue import Queue
 from .vendor.lddtree import lddtree
+from elftools.elf.elffile import ELFFile, ELFError  # type: ignore
+
+
+lib_rgx = re.compile(".*\\.so(.[.0-9]+){0,1}$")
+
+
+def is_elf(path: str) -> bool:
+    try:
+        with open(path, 'rb') as f:
+            elf = ELFFile(f)
+            return bool(elf)
+    except (IOError, ELFError):
+        return False
+
+
+def _maybe_lib(path: str) -> bool:
+    return lib_rgx.match(path) is not None
+
+
+def check_if_lib(path: str) -> bool:
+    return _maybe_lib(path) and is_elf(path)
+
+
+def scantree(path: str) -> Iterator[DirEntry]:
+    """
+    Recursively yield DirEntry objects for given directory.
+    """
+    for entry in scandir(path):
+        if entry.is_dir(follow_symlinks=False):
+            yield from scantree(entry.path)
+        else:
+            yield entry
+
+
+def find_libs(path: str) -> Iterator[str]:
+    """
+    Recursively list directory looking for dynamic library files.
+    """
+    return (e.path
+            for e in scantree(path)
+            if check_if_lib(e.path))
 
 
 def dpkg_s(*args: str) -> Tuple[List[Tuple[str, str]], List[str]]:
